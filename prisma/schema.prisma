@@ -1,0 +1,128 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  // url is loaded from prisma.config.ts in Prisma 7
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      String   // ADMIN, CUSTOMER, AGENT
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ordersAsCustomer Order[]           @relation("CustomerOrders")
+  ordersAsAgent    Order[]           @relation("AgentOrders")
+  trackingActions  TrackingHistory[] @relation("ActorHistory")
+}
+
+model Zone {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  areas          Area[]
+  pickupOrders   Order[] @relation("PickupZone")
+  dropOrders     Order[] @relation("DropZone")
+}
+
+model Area {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  zoneId    String
+  zone      Zone     @relation(fields: [zoneId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model RateCard {
+  id           String   @id @default(uuid())
+  orderType    String   // B2B, B2C
+  zoneType     String   // INTRA, INTER
+  baseRate     Float    // Base rate for the first unit
+  perKgRate    Float    // Rate for every additional kg
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([orderType, zoneType])
+}
+
+model GlobalConfig {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Order {
+  id               String   @id @default(uuid())
+  customerId       String
+  customer         User     @relation("CustomerOrders", fields: [customerId], references: [id])
+  
+  pickupAddress    String
+  dropAddress      String
+  
+  pickupZoneId     String
+  pickupZone       Zone     @relation("PickupZone", fields: [pickupZoneId], references: [id])
+  
+  dropZoneId       String
+  dropZone         Zone     @relation("DropZone", fields: [dropZoneId], references: [id])
+  
+  length           Float
+  breadth          Float
+  height           Float
+  actualWeight     Float
+  volumetricWeight Float
+  billableWeight   Float
+  
+  orderType        String   // B2B, B2C
+  paymentType      String   // PREPAID, COD
+  codSurcharge     Float
+  zoneCharge       Float
+  totalCharge      Float
+  
+  assignedAgentId  String?
+  agent            User?    @relation("AgentOrders", fields: [assignedAgentId], references: [id])
+  
+  status           String   @default("PENDING") // PENDING, ASSIGNED, PICKED_UP, IN_TRANSIT, OUT_FOR_DELIVERY, DELIVERED, FAILED
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  history          TrackingHistory[]
+  reschedules      Reschedule[]
+}
+
+model TrackingHistory {
+  id        String   @id @default(uuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id])
+  
+  status    String
+  actorId   String
+  actor     User     @relation("ActorHistory", fields: [actorId], references: [id])
+  
+  createdAt DateTime @default(now())
+}
+
+model Reschedule {
+  id        String   @id @default(uuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id])
+  
+  newDate   DateTime
+  reason    String?
+  
+  createdAt DateTime @default(now())
+}
